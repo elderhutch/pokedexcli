@@ -2,15 +2,23 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 )
+
+type config struct {
+	next string
+	prev string
+}
 
 type cliCommand struct {
 	name        string
 	description string
 	callback    func() error
+	direction   *config
 }
 
 func helpCommand() error {
@@ -27,6 +35,68 @@ func commandExit() error {
 	return nil
 }
 
+// Structs for parsing the API response
+type locationAreaResponse struct {
+	Count    int    `json:"count"`
+	Next     string `json:"next"`
+	Previous any    `json:"previous"`
+	Results  []struct {
+		Name string `json:"name"`
+		URL  string `json:"url"`
+	} `json:"results"`
+}
+
+func mapCommand() error {
+	req, err := http.NewRequest("GET", "https://pokeapi.co/api/v2/location-area", nil)
+	if err != nil {
+		return err
+	}
+	client := &http.Client{}
+	res, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	var apiResp locationAreaResponse
+	decoder := json.NewDecoder(res.Body)
+	err = decoder.Decode(&apiResp)
+	if err != nil {
+		return err
+	}
+
+	for _, area := range apiResp.Results {
+		fmt.Println(area.Name)
+	}
+	return nil
+}
+
+func mapbCommand() error {
+	req, err := http.NewRequest("GET", "https://pokeapi.co/api/v2/location-area", nil)
+	if err != nil {
+		return err
+	}
+	client := &http.Client{}
+	res, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	var apiResp locationAreaResponse
+	decoder := json.NewDecoder(res.Body)
+	err = decoder.Decode(&apiResp)
+	if err != nil {
+		return err
+	}
+
+	for _, area := range apiResp.Results {
+		fmt.Println(area.Name)
+	}
+
+	return nil
+}
+
 func main() {
 	scanner := bufio.NewScanner(os.Stdin)
 	fmt.Print("Pokedex > ")
@@ -40,6 +110,16 @@ func main() {
 			name:        "help",
 			description: "Show help",
 			callback:    helpCommand,
+		},
+		"map": {
+			name:        "map",
+			description: "Show map",
+			callback:    mapCommand,
+		},
+		"mapb": {
+			name:        "mapb",
+			description: "Show previous map",
+			callback:    mapbCommand,
 		},
 	}
 
