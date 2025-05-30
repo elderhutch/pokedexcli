@@ -9,6 +9,8 @@ import (
 	"strings"
 )
 
+var lastWords []string
+
 func helpCommand() error {
 	fmt.Println("Welcome to the Pokedex!")
 	fmt.Println("Usage:")
@@ -23,7 +25,59 @@ func commandExit() error {
 	return nil
 }
 
+func captureCommand(s string) error {
+	url := "https://pokeapi.co/api/v2/pokemon/" + s
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return err
+	}
+	client := &http.Client{}
+	res, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	var apiResp ExploredArea
+	decoder := json.NewDecoder(res.Body)
+	err = decoder.Decode(&apiResp)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Throwing a Pokeball at %s...\n", apiResp.Name)
+
+	return nil
+}
+
+func exploreCommand(s string) error {
+	url := "https://pokeapi.co/api/v2/location-area/" + s
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return err
+	}
+	client := &http.Client{}
+	res, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	var apiResp ExploredArea
+	decoder := json.NewDecoder(res.Body)
+	err = decoder.Decode(&apiResp)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Location Area: %s\n", apiResp.Name)
+	fmt.Println("Pokemon encounters:")
+	for _, encounter := range apiResp.PokemonEncounters {
+		fmt.Printf("- %s\n", encounter.Pokemon.Name)
+	}
+	return nil
+}
+
 func mapCommand(cfg *mapDirection) func() error {
+
 	return func() error {
 		url := "https://pokeapi.co/api/v2/location-area"
 		if cfg.next != "" {
@@ -132,10 +186,46 @@ func startRepl(cfg *mapDirection) {
 			callback:    mapbCommand(cfg),
 			direction:   cfg,
 		},
+		"explore": {
+			name:        "explore",
+			description: "Explore a location",
+			callback: func() error {
+				if len(lastWords) > 1 {
+					location := strings.TrimSpace(lastWords[1])
+					return exploreCommand(location)
+				}
+				fmt.Print("Enter location area name: ")
+				inputScanner := bufio.NewScanner(os.Stdin)
+				if inputScanner.Scan() {
+					location := strings.TrimSpace(inputScanner.Text())
+					return exploreCommand(location)
+				}
+				return nil
+			},
+		},
+		"catch": {
+			name:        "catch",
+			description: "Catch a Pokemon",
+			callback: func() error {
+				if len(lastWords) > 1 {
+					pokemon := strings.TrimSpace(lastWords[1])
+					return captureCommand(pokemon)
+				}
+				fmt.Print("Enter a pokemon name: ")
+				inputScanner := bufio.NewScanner(os.Stdin)
+				if inputScanner.Scan() {
+					pokemon := strings.TrimSpace(inputScanner.Text())
+					return captureCommand(pokemon)
+				}
+				return nil
+			},
+			direction: cfg,
+		},
 	}
 
 	for scanner.Scan() {
 		words := strings.Fields(scanner.Text())
+		lastWords = words
 		if len(words) == 0 {
 			fmt.Print("Pokedex > ")
 			continue
